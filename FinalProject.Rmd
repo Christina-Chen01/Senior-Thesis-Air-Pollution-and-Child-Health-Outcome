@@ -1,0 +1,141 @@
+---
+title: "FinalProject"
+author: "Christina Chen"
+date: "2023-04-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(haven)
+```
+
+```{r}
+cityday <- read.csv("/Users/chujunchen/Desktop/ECON 0466/Research Paper/city_day(backup).csv")
+
+# outdoor air quality
+airquality <- read.csv("/Users/chujunchen/Desktop/ECON 0466/Research Paper/air-quality-india(2017-2022).csv")
+
+airquality <- airquality %>%
+  filter(Year != 2022)
+
+air_year <- airquality %>%
+  group_by(Year) %>%
+  summarise(averagepm2.5 = mean(PM2.5))
+
+air_month <- airquality %>%
+  group_by(Month) %>%
+  summarise(averagepm2.5 = mean(PM2.5))
+```
+
+```{r}
+# DHS dataset
+dhs <- read_dta("/Users/chujunchen/Desktop/ECON 0466/Research Paper/DHS2019-2021/DHS_cleaned.dta")
+
+dhs <- dhs %>%
+  rename("month" = "v006",
+         "year" = "v007",
+         "urban" = "v025",
+         "cookfuel" = "v161",
+         "cough" = "h31",
+         "birthweight" = "m19",
+         "smoke" = "v463a") %>%
+  filter(birthweight < 9900) %>%
+  mutate(urban = ifelse(urban == 2, 0, 1),
+         birthweight = birthweight / 1000) %>%
+  filter(cough != 8) %>%
+  filter(cookfuel < 96)
+
+  
+
+    
+fuel_types <- data.frame(
+  code = c(1,2,3,4,5,6,7,8,9,10,11,95),
+  fuel_type = c("Electricity", "Liquified petroleum gas", "Natural gas", "Biogas", "Kerosene", "Coal-based", "Charcoal", "Wood", "Straw/grass","Crop", "Dung", "Do not cook"))
+# assuming your data is in a data frame called 'my_data'
+# use the lookup table to replace the codes with the fuel types
+dhs$cookfuel <- fuel_types$fuel_type[match(dhs$cookfuel, fuel_types$code)]
+
+
+# Change the code for cough
+cough_types <- data.frame(
+  code = c(0,1,2),
+  cough_type = c("No", "Yes, last 24 hours", "Yes, last two weeks"))
+dhs$cough <- cough_types$cough_type[match(dhs$cough, cough_types$code)]
+
+
+```
+
+```{r}
+yestocough <- dhs %>%
+  select(cookfuel, cough) %>%
+  filter(cough == "Yes, last two weeks")
+
+major_types <- c("Liquified petroleum gas", "Wood", "Dung", "Crop")
+
+# Create a new column that groups the cooking fuels into the major types and "other"
+yestocough$cookfuel <- ifelse(yestocough$cookfuel %in% major_types, yestocough$cookfuel, "other")
+
+yestocough <- yestocough %>% count(cookfuel)
+
+
+total <- sum(yestocough$n)
+
+percent_disp <- (yestocough$n / total) * 100
+yestocough_prop <- data.frame(yestocough, percent_disp)
+
+cough_fuel <- ggplot(yestocough_prop, aes(x="", y=percent_disp, fill=cookfuel)) +
+  geom_bar(stat="identity", width=1, color="black") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="left") +
+  geom_text(aes(y = percent_disp, label = cookfuel), position = position_stack(vjust = 0.5), color = "black", size=4) +
+  scale_fill_brewer(palette="Set3") + 
+  ggtitle("Proportion of Cooking Fuel Types among \nChildren with Cough in last two weeks in India")
+
+cough_fuel
+```
+
+
+
+```{r}
+# incidence of cough and cooking fuel
+cough_fuel_backup <- dhs %>% ggplot(aes(x = cough, fill = cookfuel)) + 
+  geom_bar(position = "dodge") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(x = "Incidence of Cough", y = "Frequency", fill = "Cooking Fuel") +
+  ggtitle("Relationship between type of cooking fuel and \nchild's incidence of cough accompanied by short rapid breathing")
+
+cough_fuel_backup
+```
+
+```{r}
+# birth weight and cooking fuel
+birthweight_fuel_left <- dhs %>% ggplot(aes(x=birthweight, col=cookfuel)) + 
+  geom_density() +
+  ggtitle("Relationship between type of cooking fuel and \nchild's birth weight (kg) bewteen 2019-2021 in India") +
+  xlab("Child's birth weight (kg)") +
+  xlim(0, 3)
+
+birthweight_fuel_left
+
+birthweight_fuel_right <- dhs %>% ggplot(aes(x=birthweight, col=cookfuel)) + 
+  geom_density() +
+  ggtitle("Relationship between type of cooking fuel and \nchild's birth weight (kg) bewteen 2019-2021 in India") +
+  xlab("Child's birth weight (kg)") +
+  xlim(3, 5)
+
+birthweight_fuel_right
+```
+
+```{r}
+# Maternal smoking status proportion among children with cough in 2 week
+
+
+```
+
